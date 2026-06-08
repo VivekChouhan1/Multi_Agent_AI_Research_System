@@ -23,6 +23,7 @@ def web_search(query:str):
     return "\n----\n".join(web_output)
 
 
+
 @tool
 def scrape_url_bs(url : str) -> str:
     """ Scrape and return clean text content from a given URL for deeper reading."""
