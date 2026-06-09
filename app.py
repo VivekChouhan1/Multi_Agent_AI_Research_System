@@ -333,7 +333,7 @@ col_input, col_btn = st.columns([5, 1])
 with col_input:
     topic = st.text_input(
         label="",
-        placeholder="e.g.  AI's impact on drug discovery ...",
+        placeholder="e.g. AI's impact on drug discovery ...",
         key="topic_input",
         label_visibility="collapsed",
     )
@@ -449,10 +449,53 @@ elif run_clicked and not topic.strip():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 import re
 
+def parse_sources(sources_raw: str):
+    """
+    Extract (label, url) pairs from any format the LLM may output:
+      1. [Title] — https://...          (em-dash format)
+      2. [Title](https://...)           (markdown link)
+      3. [Title](https://...) -         (markdown link with trailing dash)
+      4. - [Title] — https://...        (bullet + em-dash)
+      5. Bare https://... lines         (plain URL)
+    Returns list of (label, url) tuples.
+    """
+    entries = []
+
+    # Format 1 & 4: [Label] — URL  (em/en-dash or plain hyphen separator)
+    for m in re.finditer(r'\[([^\]]+)\]\s*[—–-]+\s*(https?://[^\s\)]+)', sources_raw):
+        entries.append((m.group(1).strip(), m.group(2).strip().rstrip(')')))
+
+    # Format 2 & 3: [Label](URL)
+    if not entries:
+        for m in re.finditer(r'\[([^\]]+)\]\((https?://[^\s\)]+)\)', sources_raw):
+            label = m.group(1).strip()
+            url   = m.group(2).strip()
+            # skip if label IS the url (duplicate)
+            if label != url:
+                entries.append((label, url))
+            else:
+                entries.append(("", url))
+
+    # Format 5: bare URLs on their own lines, possibly preceded by a label line
+    if not entries:
+        lines = [l.strip() for l in sources_raw.splitlines() if l.strip()]
+        i = 0
+        while i < len(lines):
+            url_match = re.search(r'https?://\S+', lines[i])
+            if url_match:
+                url = url_match.group(0).rstrip(')')
+                # Check if previous line was a label
+                label = lines[i - 1] if i > 0 and not re.search(r'https?://', lines[i - 1]) else ""
+                # Clean label of bullets/brackets
+                label = re.sub(r'^[-•*\[\]]+\s*', '', label).strip()
+                entries.append((label, url))
+            i += 1
+
+    return entries
+
+
 def render_report(text: str):
-    """Render report markdown but intercept the Sources section to display
-    each source on its own styled line."""
-    # Split on a "Sources" heading (## Sources, **Sources**, or plain Sources)
+    """Render report, replacing the Sources section with clean styled cards."""
     source_pattern = re.compile(
         r'(#{1,3}\s*Sources\b[^\n]*|^\*{1,2}Sources\*{1,2}[^\n]*)',
         re.IGNORECASE | re.MULTILINE
@@ -460,34 +503,25 @@ def render_report(text: str):
     parts = source_pattern.split(text, maxsplit=1)
 
     if len(parts) == 3:
-        before, heading, sources_raw = parts
+        before, _heading, sources_raw = parts
         st.markdown(before)
-        st.markdown(f"### 🔗 Sources")
+        st.markdown("### 🔗 Sources")
 
-        # Parse individual source entries: [Label] — URL  or  numbered/bulleted
-        entries = re.findall(
-            r'\[([^\]]+)\]\s*[—–-]+\s*(https?://\S+)',
-            sources_raw
-        )
+        entries = parse_sources(sources_raw)
+
         if entries:
             for label, url in entries:
+                url_clean = url.rstrip('.,)')
+                display_label = label if label else url_clean
                 st.markdown(f"""
 <div class="source-item">
-  <span class="source-label">{label}</span>
-  <a class="source-url" href="{url}" target="_blank">{url}</a>
+  <span class="source-label">{display_label}</span>
+  <a class="source-url" href="{url_clean}" target="_blank">{url_clean}</a>
 </div>""", unsafe_allow_html=True)
         else:
-            # Fallback: split by [ to get individual entries
-            raw_entries = re.split(r'(?=\[)', sources_raw.strip())
-            for entry in raw_entries:
-                entry = entry.strip()
-                if entry:
-                    st.markdown(f"""
-<div class="source-item">
-  <span class="source-raw">{entry}</span>
-</div>""", unsafe_allow_html=True)
+            # Last resort: just render raw text
+            st.markdown(sources_raw)
     else:
-        # No Sources section found — render as-is
         st.markdown(text)
 
 
