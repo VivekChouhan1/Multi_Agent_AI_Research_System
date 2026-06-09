@@ -333,7 +333,7 @@ col_input, col_btn = st.columns([5, 1])
 with col_input:
     topic = st.text_input(
         label="",
-        placeholder="e.g.  Quantum computing in 2025  ·  AI's impact on drug discovery ...",
+        placeholder="e.g.  AI's impact on drug discovery ...",
         key="topic_input",
         label_visibility="collapsed",
     )
