@@ -6,6 +6,11 @@ from langchain_core.output_parsers import StrOutputParser
 from tools import web_search, scrape_url_bs
 from dotenv import load_dotenv
 load_dotenv()
+import os
+
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
+GOOGLE_API_KEY  = os.environ.get("GOOGLE_API_KEY")
+
 
 # Model Setup
 llm_gemini = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0)
