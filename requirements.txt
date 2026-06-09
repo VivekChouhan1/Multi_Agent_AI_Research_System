@@ -8,3 +8,6 @@ langchain_community
 beautifulsoup4
 requests
 tavily-python
+rich
+langchain_core
+langgraph
